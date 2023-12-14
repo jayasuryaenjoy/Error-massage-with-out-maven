@@ -1,0 +1,198 @@
+package com.serole.egi.utility;
+
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.mail.MessagingException;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+
+import org.apache.commons.codec.binary.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.stereotype.Component;
+import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+import org.springframework.web.client.RestTemplate;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.serole.egi.data.Mail;
+
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateException;
+
+@Component
+public class EgiUtility {
+
+	@Autowired
+	private Configuration freemarkerConfig;
+
+	@Autowired
+	private JavaMailSender sender;
+
+	@Value("${spring.mail.fromMailId}")
+	private String senderId;
+
+	@Value("${receipient.mail.id}")
+	private String rMailId;
+
+	@Value("${receipient.cc.mail.id}")
+	private String ccMailId;
+
+	private static Logger log = LoggerFactory.getLogger(EgiUtility.class);
+
+	HttpHeaders createHeaders(String username, String password) {
+		log.info("Start : Calling createHeaders method");
+		return new HttpHeaders() {
+			{
+				String auth = username + ":" + password;
+				byte[] encodedAuth = Base64.encodeBase64(auth.getBytes(Charset.forName("US-ASCII")));
+				String authHeader = "Basic " + new String(encodedAuth);
+				set("Authorization", authHeader);
+			}
+		};
+	}
+
+	public void sendSimpleMessage(Mail mail) throws MessagingException, IOException, TemplateException {
+		log.info("====Start : Calling from sendSimpleMessage method====");
+		MimeMessage message = sender.createMimeMessage();
+		MimeMessageHelper helper = new MimeMessageHelper(message, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
+				StandardCharsets.UTF_8.name());
+		Template t = null;
+		if (mail.getModel().containsKey("records"))
+			t = freemarkerConfig.getTemplate("failure-template.ftl");
+		else
+			t = freemarkerConfig.getTemplate("email-template.ftl");
+		String html = FreeMarkerTemplateUtils.processTemplateIntoString(t, mail.getModel());
+		String a[] = mail.getCc().split(",");
+		InternetAddress add[] = new InternetAddress[a.length];
+		for (int i = 0; i < a.length; i++) {
+			add[i] = new InternetAddress(a[i].trim());
+		}
+		helper.setTo(mail.getTo());
+		helper.setCc(a);
+		helper.setText(html, true);
+		helper.setSubject(mail.getSubject());
+		helper.setFrom(mail.getFrom());
+
+		sender.send(message);
+
+	}
+
+	public <T> void generateReq(String freshUrl, T data, String userName, String password, String msg, String retMsg)
+			throws MessagingException, IOException, TemplateException {
+		log.info("====Start : Calling generateReq method====");
+		// BodyBuilder response=ResponseEntity.status(400);
+		HttpHeaders headers = createHeaders(userName, password);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		 RestTemplate template = new RestTemplate(clientHttpRequestFactory());
+		HttpEntity<T> request = new HttpEntity<T>(data, headers);
+		ObjectMapper mapper = new ObjectMapper();
+		String jsonStr = mapper.writeValueAsString(data);
+		log.info("request object===>>>" + jsonStr);
+		String jsonStr1 = mapper.writeValueAsString(request);
+		log.info("request object===>>>" + jsonStr1);
+		try {
+			log.info("==============Request Object Start============");
+			ResponseEntity<String> response = template.exchange(freshUrl, HttpMethod.POST, request, String.class,
+					new Object[0]);
+//			ResponseEntity<String> response = null;
+			log.info("==============Request Object End============");
+			Mail mail = new Mail();
+			mail.setFrom(senderId);
+			mail.setTo(rMailId);
+			mail.setSubject(msg);
+			mail.setCc(ccMailId);
+			Map model = new HashMap();
+			
+			if (response != null) {
+				log.info("=================Response Json==========="+response.getBody());
+				Map<String, Object> map = mapper.readValue(response.getBody(), Map.class);
+				StringBuilder sb = new StringBuilder();
+				if (response.getStatusCodeValue() == 200) {
+
+					model.put("result", iterate(map, sb).replaceAll("txt", "").replaceAll("_", " "));
+					model.put("records", retMsg);
+
+				} else {
+					model.put("result", iterate(map, sb).replaceAll("txt", "").replaceAll("_", " "));
+					model.put("records", "data issues with following records");
+				}
+				mail.setModel(model);
+
+				sendSimpleMessage(mail);
+			} else {
+				log.info("=================Response Json==========="+response.getBody());
+				model.put("result", "No Response from IIB end");
+				model.put("records", "Please contact system admin");
+				mail.setModel(model);
+
+				sendSimpleMessage(mail);
+			}
+
+		} catch (Exception e) {
+			log.info("====Entered Catch block====");
+			e.printStackTrace();
+
+			Mail mail = new Mail();
+			mail.setFrom(senderId);
+			mail.setTo(rMailId);
+			mail.setSubject(msg);
+			mail.setCc(ccMailId);
+			Map model = new HashMap();
+
+			model.put("result", e.toString());
+			model.put("records", "data issues with following records");
+
+			mail.setModel(model);
+
+			sendSimpleMessage(mail);
+		}
+		log.info("====End : Calling generateReq method====");
+	}
+
+	private ClientHttpRequestFactory clientHttpRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+
+        // Disable SSL certificate validation
+        factory.setTrustAll()
+
+        return factory;
+    }
+
+	public String iterate(Map<String, Object> iterateMap, StringBuilder sb) {
+		String str = null;
+		iterateMap.forEach((key, value) -> {
+
+			if (value instanceof String) {
+				sb.append("<br>" + "<b>" + key.substring(0, 1).toUpperCase() + key.substring(1, key.length()) + ": </b>"
+						+ value);
+			} else if (value instanceof List) {
+				List<Map<String, Object>> mapList = (List<Map<String, Object>>) value;
+				mapList.forEach(iterateList -> iterate(iterateList, sb));
+
+			}
+
+		});
+		str = sb.toString();
+		log.info("data check " + str);
+		return str;
+
+	}
+
+}

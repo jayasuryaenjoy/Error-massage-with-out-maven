@@ -1,0 +1,30 @@
+import java.util.regex.Matcher;
+
+import java.util.regex.Pattern;
+
+public class Basic {
+
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+		System.out.println("132456");
+		
+		 String inputString = "YourString04092MoreText";
+
+	        Pattern pattern = Pattern.compile("11");
+	        Matcher matcher = pattern.matcher(inputString);
+	        while (matcher.find()) {
+	            String extractedValue = matcher.group();
+	            System.out.println("Extracted Value: " + extractedValue);
+	        }
+	        int startIndex = inputString.indexOf("04092") + "YourString".length();
+	        int endIndex = inputString.indexOf("04092");
+	        if (startIndex >= 0 && endIndex >= 0) {
+	            String extractedValue = inputString.substring(startIndex, endIndex);
+	            System.out.println("Extracted Value: " + extractedValue);
+	        } else {
+	            System.out.println("No numerical value found in the string.");
+	        }
+
+	}
+
+}

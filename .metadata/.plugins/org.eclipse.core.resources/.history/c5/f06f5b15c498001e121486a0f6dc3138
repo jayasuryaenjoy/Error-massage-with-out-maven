@@ -1,0 +1,23 @@
+import java.util.regex.Matcher;
+
+import java.util.regex.Pattern;
+
+public class Basic {
+
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+		System.out.println("132456");
+		
+		 String inputString = "YourString04092MoreText";
+
+	        Pattern pattern = Pattern.compile("11");
+	        Matcher matcher = pattern.matcher(inputString);
+	        while (matcher.find()) {
+	            String extractedValue = matcher.group();
+	            System.out.println("Extracted Value: " + extractedValue);
+	        }
+	        
+
+	}
+
+}

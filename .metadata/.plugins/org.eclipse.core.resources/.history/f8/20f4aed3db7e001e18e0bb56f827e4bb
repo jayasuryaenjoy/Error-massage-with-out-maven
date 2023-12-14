@@ -1,0 +1,439 @@
+package com.serole.egi.helper;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.Format;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import com.opencsv.CSVWriter;
+import com.serole.egi.data.DailyPolicyDetailsList;
+import com.serole.egi.data.EgiData;
+import com.serole.egi.data.F98Request;
+import com.serole.egi.data.ODClaimDetailsList;
+
+@Component
+public class NewF98Helper {
+
+	@Value("${new.vehicle.f98.excel.filename}")
+	private String fileName;
+
+	@Value("${new.vehicle.f98.file.location}")
+	private String fileLocation;
+
+	private static Logger log = LoggerFactory.getLogger(F98Helper.class);
+
+	public void createExcel(List<Map<String, Object>> objArr, String sheetName, String[] headerCols)
+			throws IOException, FileNotFoundException {
+		log.info("====Start : Creating Excel sheet for New F98 data====");
+		Workbook workbook = new XSSFWorkbook();
+		Sheet sheet = workbook.createSheet(sheetName);
+		Row headerRow = sheet.createRow(0);
+		Format formatter = new SimpleDateFormat("dd-MMM-yyyy");
+		Date d = null;
+		for (int i = 0; i < headerCols.length; i++) {
+			Cell cell = headerRow.createCell(i);
+			cell.setCellValue(headerCols[i]);
+
+		}
+
+		String fName = fileName.substring(0, fileName.indexOf("."));
+		String extension = fileName.substring(fileName.indexOf("."), fileName.length() - 1);
+
+		FileOutputStream fileOut;
+		Cell c;
+		Row r;
+		int r1 = 0;
+		while (r1 < objArr.size()) {
+
+			r = sheet.createRow(r1 + 1);
+			Map res = objArr.get(r1);
+			for (int i = 0; i < headerCols.length; i++) {
+
+				if (res.get(headerCols[i]) != null) {
+
+					if (headerCols[i].equals("Txt_Date_Of_Submission")) {
+
+						String s = formatter.format(res.get(headerCols[i]));
+						r.createCell(i).setCellValue(s.toUpperCase());
+					}
+
+					else if (headerCols[i].equals("Txt_Date_Of_Transaction")) {
+
+						String s = formatter.format(res.get(headerCols[i]));
+						r.createCell(i).setCellValue(s.toUpperCase());
+					} else if (headerCols[i].equals("Date_Policy_Start_Date")) {
+
+						String s = formatter.format(res.get(headerCols[i]));
+						r.createCell(i).setCellValue(s.toUpperCase());
+					}
+
+					else if (headerCols[i].equals("Date_Policy_End_Date")) {
+
+						String s = formatter.format(res.get(headerCols[i]));
+						r.createCell(i).setCellValue(s.toUpperCase());
+					} else if (headerCols[i].equals("Num_IDV")) {
+						Double odLoss = Double.parseDouble(res.get(headerCols[i]).toString());
+						Integer nOdExpenses = odLoss.intValue();
+						r.createCell(i).setCellValue(nOdExpenses);
+
+					} else if (headerCols[i].equals("NCB_PER")) {
+						if (!res.get(headerCols[i]).toString().isEmpty()) {
+							Double odLoss = Double.parseDouble(res.get(headerCols[i]).toString());
+							Integer nOdExpenses = odLoss.intValue();
+							r.createCell(i).setCellValue(nOdExpenses);
+						}
+
+					} else if (headerCols[i].equals("Num_Net_TP_Premium")) {
+						Double odLoss = Double.parseDouble(res.get(headerCols[i]).toString());
+						Integer nOdExpenses = odLoss.intValue();
+						r.createCell(i).setCellValue(nOdExpenses);
+
+					} else if (headerCols[i].equals("Num_Net_OD_Premium")) {
+						Double odLoss = Double.parseDouble(res.get(headerCols[i]).toString());
+						Integer nOdExpenses = odLoss.intValue();
+						r.createCell(i).setCellValue(nOdExpenses);
+
+					}
+
+					else
+						r.createCell(i).setCellValue(res.get(headerCols[i]).toString());
+				}
+				if (headerCols[i].equals("Total_Count")) {
+
+					r.createCell(i).setCellValue(objArr.size());
+				}
+			}
+
+			r1++;
+		}
+
+		fileOut = new FileOutputStream(new File(fileLocation + fName + "-" + LocalDate.now() + extension));
+		workbook.write(fileOut);
+		fileOut.close();
+
+		workbook.close();
+		log.info("====End : Successfully created New F98 data excel sheet====");
+	}
+
+	public F98Request readNewF98Excel(String fileNm, String fileLoc) throws IOException {
+		log.info("====Start : reading New F98 data from excel sheet====");
+		Workbook workbook = null;
+		Sheet worksheet = null;
+		F98Request data = new F98Request();
+		String fName = fileNm.substring(0, fileNm.indexOf("."));
+		String extension = fileNm.substring(fileNm.indexOf("."), fileNm.length() - 1);
+		FileInputStream fis = new FileInputStream(new File(fileLoc + fName + "-" + LocalDate.now() + extension));
+
+		String fileExtensionName = fileNm.substring(fileNm.indexOf("."));
+		System.out.println("testing file extension" + fileExtensionName);
+		if (fileExtensionName.endsWith(".xls")) {
+			workbook = new HSSFWorkbook(fis);
+
+			worksheet = (HSSFSheet) workbook.getSheetAt(0);
+		}
+		if (fileExtensionName.endsWith(".xlsx")) {
+			workbook = new XSSFWorkbook(fis);
+
+			worksheet = (XSSFSheet) workbook.getSheetAt(0);
+		}
+		DataFormatter df = new DataFormatter();
+
+		List<DailyPolicyDetailsList> claimList = new ArrayList<DailyPolicyDetailsList>();
+		int i = 1;
+
+		while (i <= worksheet.getLastRowNum()) {
+
+			DailyPolicyDetailsList claim = new DailyPolicyDetailsList();
+
+			Row row = worksheet.getRow(i++);
+			if (row.getCell(3) != null) {
+
+				claim.setTxt_Office_Code(df.formatCellValue(row.getCell(3)).trim());
+
+			}
+			if (row.getCell(4) != null) {
+
+				claim.setTxt_Policy_Number(df.formatCellValue(row.getCell(4)).trim());
+
+			}
+
+			if (row.getCell(5) != null) {
+
+				claim.setTxt_Reg_Number_Vehicle(df.formatCellValue(row.getCell(5)).trim());
+
+			}
+			if (row.getCell(6) != null) {
+
+				claim.setTxt_Chassis_Number(df.formatCellValue(row.getCell(6)).trim());
+
+			}
+			if (row.getCell(7) != null) {
+
+				claim.setTxt_Engine_Number(df.formatCellValue(row.getCell(7)).trim());
+
+			}
+
+			if (row.getCell(8) != null) {
+
+				claim.setTxt_Class_Code(df.formatCellValue(row.getCell(8)).trim());
+
+			}
+
+			if (row.getCell(9) != null) {
+
+				claim.setDate_Policy_Start_Date(df.formatCellValue(row.getCell(9)).trim());
+
+			}
+			if (row.getCell(10) != null) {
+
+				claim.setDate_Policy_End_Date(df.formatCellValue(row.getCell(10)).trim());
+
+			}
+
+			if (row.getCell(11) != null) {
+
+				claim.setTxt_Date_Of_Transaction(df.formatCellValue(row.getCell(11)).trim());
+
+			}
+
+			if (row.getCell(12) != null) {
+				String odExp = df.formatCellValue(row.getCell(12)).trim();
+
+				claim.setType_Of_Transaction(odExp);
+			}
+			/*
+			 * if(row.getCell(13)!=null) { String
+			 * odExp=df.formatCellValue(row.getCell(13)).trim(); Double
+			 * odLoss=Double.parseDouble(odExp); Integer nOdExpenses=odLoss.intValue();
+			 * claim.setNet_Premium(nOdExpenses); }
+			 */
+			if (row.getCell(14) != null) {
+				claim.setIDV(df.formatCellValue(row.getCell(14)).trim());
+			} else {
+				claim.setIDV("0");
+			}
+			if (row.getCell(15) != null) {
+				claim.setType_of_Policy(df.formatCellValue(row.getCell(15)).trim());
+			}
+
+			if (row.getCell(16) != null) {
+				String odExp = df.formatCellValue(row.getCell(16)).trim();
+				if (!odExp.isEmpty()) {
+					Double odLoss = Double.parseDouble(odExp);
+					Integer nOdExpenses = odLoss.intValue();
+					claim.setNcb_per("" + nOdExpenses);
+				}
+
+			}
+
+			if (row.getCell(17) != null) {
+				claim.setNil_dep_flag(df.formatCellValue(row.getCell(17)).trim());
+			} else {
+				claim.setNil_dep_flag("");
+			}
+			if (row.getCell(18) != null) {
+				String odExp = df.formatCellValue(row.getCell(18)).trim();
+				Double odLoss = Double.parseDouble(odExp);
+				Integer nOdExpenses = odLoss.intValue();
+				claim.setNum_net_TP_premium("" + nOdExpenses);
+			} else {
+				claim.setNum_net_TP_premium("");
+			}
+
+			if (row.getCell(19) != null) {
+				String odExp = df.formatCellValue(row.getCell(19)).trim();
+				Double odLoss = Double.parseDouble(odExp);
+				Integer nOdExpenses = odLoss.intValue();
+				claim.setNum_net_OD_premium("" + nOdExpenses);
+			} else {
+				claim.setNum_net_OD_premium("");
+			}
+
+			if (row.getCell(1) != null)
+				data.setTxt_Date_Of_Submission(df.formatCellValue(row.getCell(1)).trim());
+
+			data.setTxt_Insurer(df.formatCellValue(row.getCell(0)).trim());
+			String s = df.formatCellValue(row.getCell(2)).trim();
+			Integer nStatus = Integer.parseInt(s);
+			data.setTotal_Count(nStatus);
+			claimList.add(claim);
+			data.setDaily_Policy_Details_list(claimList);
+
+			workbook.close();
+
+		}
+		log.info("====End : Successfully formated New F98 data from the excel sheet====");
+		return data;
+	}
+
+	public void createCsv(List<Map<String, Object>> objArr, String sheetName, String[] headerCols) throws IOException {
+		CSVWriter csvWriter = new CSVWriter(new FileWriter(fileLocation + "f99.csv"));
+		List<String[]> aList = new ArrayList<String[]>();
+		int r1 = 0;
+		while (r1 < objArr.size()) {
+			String[] dataArray = new String[headerCols.length];
+
+			Map res = objArr.get(r1);
+			for (int i = 0; i < headerCols.length; i++) {
+				if (res.get(headerCols[i]) != null)
+					dataArray[i] = res.get(headerCols[i]).toString();
+
+			}
+			aList.add(dataArray);
+			r1++;
+		}
+		csvWriter.writeAll(aList);
+
+	}
+
+	public EgiData readCsvFile() {
+		BufferedReader br = null;
+		String line = "";
+		EgiData egiData = new EgiData();
+		try {
+			br = new BufferedReader(new FileReader(fileLocation + "example.csv"));
+			List<ODClaimDetailsList> claimList = new ArrayList<ODClaimDetailsList>();
+
+			while ((line = br.readLine()) != null) {
+				String[] data = line.split(",");
+
+				ODClaimDetailsList claim = new ODClaimDetailsList();
+
+				if (data[2] != null && !data[2].equals("")) {
+
+					claim.setTxt_Office_Code(data[2]);
+
+				}
+				if (data[3] != null && !data[3].equals("")) {
+
+					claim.setTxt_Policy_Number(data[3]);
+
+				}
+
+				if (data[4] != null) {
+
+					claim.setTxt_Reg_Number_Vehicle(data[4]);
+
+				}
+				if (data[5] != null && !data[5].equals("")) {
+
+					claim.setTxt_Chassis_Number(data[5]);
+
+				}
+				if (data[6] != null) {
+
+					claim.setTxt_Engine_Number(data[6]);
+
+				}
+				if (data[7] != null) {
+
+					claim.setTxt_Claim_Number(data[7]);
+
+				}
+				if (data[8] != null) {
+
+					claim.setTxt_Child_Claim_Number(data[8]);
+
+				}
+				if (data[9] != null) {
+
+					claim.setTxt_Class_Code(data[9]);
+
+				}
+				if (data[10] != null) {
+
+					claim.setDate_Accident_Loss(data[10]);
+
+				}
+				if (data[11] != null) {
+
+					claim.setDate_Claim_Intimation(data[11]);
+
+				}
+				if (data[12] != null) {
+
+					claim.setBoo_Total_Loss(data[12]);
+
+				}
+				if (data[13] != null) {
+
+					claim.setBoo_Theft(data[13]);
+
+				}
+				if (data[14] != null && !("").equals(data[14])) {
+					String odExp = data[14];
+					Double odLoss = Double.parseDouble(odExp);
+					Integer nOdExpenses = odLoss.intValue();
+					claim.setNum_OD_Loss_Paid(nOdExpenses);
+				}
+
+				if (data[15] != null && !("").equals(data[15])) {
+					String odExpenses = data[15];
+					Double odExpensesD = Double.parseDouble(odExpenses);
+					Integer odLoss = odExpensesD.intValue();
+					claim.setNum_OD_Expenses_Paid(odLoss);
+
+				}
+
+				if (data[16] != null) {
+
+					claim.setDate_Policy_Start_Date(data[16]);
+
+				}
+				if (data[17] != null) {
+
+					claim.setDate_Policy_End_Date(data[17]);
+
+				}
+
+				if (data[18] != null && !("").equals(data[18])) {
+					String s = data[18];
+					Integer nStatus = Integer.parseInt(s);
+					claim.setTxt_Claim_Status(nStatus);
+				}
+
+				if (data[19] != null) {
+
+					claim.setTxt_Date_Of_Transaction(data[19]);
+
+				}
+				if (data[1] != null)
+					egiData.setTxt_Date_Of_Submission(data[1]);
+
+				egiData.setTxt_Insurer(data[0]);
+				claimList.add(claim);
+				egiData.setOD_Claim_Details_list(claimList);
+
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return egiData;
+	}
+}

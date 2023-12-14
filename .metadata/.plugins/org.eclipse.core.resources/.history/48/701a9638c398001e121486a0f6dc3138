@@ -1,0 +1,27 @@
+import java.util.regex.Matcher;
+
+import java.util.regex.Pattern;
+
+public class Basic {
+
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+		System.out.println("132456");
+		
+		 String inputString = "YourString04092MoreText";
+
+	        // Define a regex pattern to match the numeric value
+	        Pattern pattern = Pattern.compile("\\b\\d+\\b");
+
+	        // Create a matcher with the input string
+	        Matcher matcher = pattern.matcher(inputString);
+
+	        // Find and print all matches
+	        while (matcher.find()) {
+	            String extractedValue = matcher.group();
+	            System.out.println("Extracted Value: " + extractedValue);
+	        }
+
+	}
+
+}
